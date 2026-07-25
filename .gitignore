@@ -1,16 +1,18 @@
-# Compiled class file
+# -------------------------------------------------------
+# Maven build output — never commit compiled artefacts
+# -------------------------------------------------------
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# -------------------------------------------------------
+# Maven wrapper distribution cache (downloaded by mvnw)
+# -------------------------------------------------------
+.mvn/wrapper/maven-wrapper.properties.bak
+
+# -------------------------------------------------------
+# Java compiled classes & packaging artefacts
+# -------------------------------------------------------
 *.class
-
-# Log file
-*.log
-
-# BlueJ files
-*.ctxt
-
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
-
-# Package Files #
 *.jar
 *.war
 *.nar
@@ -19,6 +21,49 @@
 *.tar.gz
 *.rar
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
-hs_err_pid*
-replay_pid*
+# -------------------------------------------------------
+# Log files
+# -------------------------------------------------------
+*.log
+
+# -------------------------------------------------------
+# IDE / editor files
+# -------------------------------------------------------
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# VS Code
+.vscode/
+
+# NetBeans
+nbactions.xml
+nb-configuration.xml
+
+# -------------------------------------------------------
+# OS-generated noise
+# -------------------------------------------------------
+.DS_Store
+Thumbs.db
+
+# -------------------------------------------------------
+# Spring Boot specific
+# -------------------------------------------------------
+# Spring Boot DevTools restart trigger
+.reloadtrigger
+
+# -------------------------------------------------------
+# Sensitive — keep application.properties committed but
+# exclude any local override files with real secrets.
+# -------------------------------------------------------
+application-local.properties
+application-secret.properties
+*.env
