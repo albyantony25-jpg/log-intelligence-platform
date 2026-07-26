@@ -1,7 +1,9 @@
 package com.logplatform.controller;
 
+import com.logplatform.dto.LogClusterResult;
 import com.logplatform.model.LogEntry;
 import com.logplatform.repository.LogEntryRepository;
+import com.logplatform.service.LogClusterService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -12,23 +14,31 @@ import java.util.List;
 /**
  * REST controller that exposes the /logs HTTP endpoints.
  *
- * @RestController  – combines @Controller + @ResponseBody; every method's return
- *                   value is serialised directly to the HTTP response body as JSON
- *                   (via Jackson, which is on the classpath via spring-boot-starter-web).
+ * Endpoints:
+ *   POST /logs          – ingest a new log entry
+ *   GET  /logs          – retrieve all log entries
+ *   GET  /logs/clusters – retrieve WARN/ERROR clusters grouped by service,
+ *                         level, and 10-minute time bucket
  *
- * @RequestMapping  – sets the base path for all endpoints in this controller.
- *
- * Constructor injection is used (preferred over @Autowired on fields) because it
- * makes dependencies explicit and enables easier unit testing.
+ * The controller is intentionally thin: it handles HTTP concerns only
+ * (routing, serialisation, status codes).  Business logic lives in
+ * dedicated service classes (e.g. LogClusterService).
  */
 @RestController
 @RequestMapping("/logs")
 public class LogEntryController {
 
     private final LogEntryRepository logEntryRepository;
+    private final LogClusterService  logClusterService;
 
-    public LogEntryController(LogEntryRepository logEntryRepository) {
+    /**
+     * Spring injects both dependencies via this single constructor.
+     * No @Autowired annotation needed — Spring auto-detects single constructors.
+     */
+    public LogEntryController(LogEntryRepository logEntryRepository,
+                              LogClusterService  logClusterService) {
         this.logEntryRepository = logEntryRepository;
+        this.logClusterService  = logClusterService;
     }
 
     // -------------------------------------------------------------------------
@@ -70,5 +80,38 @@ public class LogEntryController {
     public ResponseEntity<List<LogEntry>> getAllLogEntries() {
         List<LogEntry> entries = logEntryRepository.findAll();
         return ResponseEntity.ok(entries);
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /logs/clusters
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns WARN and ERROR log entries grouped into clusters.
+     *
+     * A cluster represents a set of log entries sharing the same:
+     *   - serviceName
+     *   - logLevel  (only WARN or ERROR — INFO is too noisy to be useful signal)
+     *   - 10-minute time bucket (timestamp floored to the nearest 10 minutes)
+     *
+     * Each cluster in the response includes:
+     *   - serviceName      – which service produced the events
+     *   - logLevel         – WARN or ERROR
+     *   - timeBucketStart  – ISO-8601 start of the 10-minute window
+     *   - count            – number of log entries in the cluster
+     *   - sampleMessages   – up to 3 representative messages
+     *
+     * Results are sorted by count descending so the highest-volume incidents
+     * appear first, making triage faster.
+     *
+     * Returns HTTP 200 OK with an empty array [] if no WARN/ERROR entries exist.
+     *
+     * Delegates entirely to LogClusterService — the controller only handles
+     * the HTTP layer (routing + response wrapping).
+     */
+    @GetMapping("/clusters")
+    public ResponseEntity<List<LogClusterResult>> getLogClusters() {
+        List<LogClusterResult> clusters = logClusterService.computeClusters();
+        return ResponseEntity.ok(clusters);
     }
 }
