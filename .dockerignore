@@ -1,0 +1,46 @@
+# =============================================================================
+# .dockerignore — files excluded from the Docker build context
+# =============================================================================
+# Keeping the build context small speeds up image builds and prevents
+# accidentally bundling local secrets or large generated files into the image.
+# =============================================================================
+
+# Maven build output — the builder stage compiles from source; pre-built
+# artifacts should never be copied into the image.
+target/
+
+# Maven wrapper distribution cache (downloaded inside the container separately)
+.mvn/wrapper/maven-wrapper.jar
+
+# Git metadata — not needed inside the container
+.git/
+.gitignore
+
+# IDE and editor configuration
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.classpath
+.project
+.settings/
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Docker files themselves (avoids redundant context)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation — not needed at runtime
+README.md
+docs/
+
+# Local environment files that may contain secrets
+*.env
+.env*
+application-local.properties
+application-secret.properties

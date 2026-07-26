@@ -168,6 +168,79 @@ This sends 50 randomised log entries across 4 services to the running API.
 
 ---
 
+## Run with Docker
+
+> **No local Java, Maven, or PostgreSQL installation required.**  
+> Docker Compose handles everything — the app is compiled inside the build container.
+
+### Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (includes Docker Compose)
+- A Groq API key — [get one free](https://console.groq.com/keys)
+
+### 1. Set the Groq API key on your host
+
+**Windows (PowerShell):**
+```powershell
+$env:GROQ_API_KEY = "gsk_your_key_here"
+```
+
+**Linux / macOS:**
+```bash
+export GROQ_API_KEY="gsk_your_key_here"
+```
+
+### 2. Start everything
+
+```bash
+docker compose up --build
+```
+
+Docker Compose will:
+1. Pull the `postgres:16` image and start the database
+2. Wait for PostgreSQL to pass its health check
+3. Build the Spring Boot app image (compiles the JAR inside Docker — no local JDK needed)
+4. Start the app once the database is ready
+
+The API is available at **`http://localhost:8081`** once you see:
+
+```
+log_intelligence_app  | Started LogIntelligencePlatformApplication in X.XXX seconds
+```
+
+### 3. (Optional) Seed fake log data
+
+While the stack is running, open a second terminal and run:
+
+```bash
+docker compose exec app \
+  java -cp app.jar \
+  -Dloader.main=com.logplatform.tools.LogGenerator \
+  org.springframework.boot.loader.launch.PropertiesLauncher
+```
+
+Or simply start your local `LogGenerator` against the exposed port — the API is reachable at `http://localhost:8081` from your host machine.
+
+### Useful Docker commands
+
+| Command | Description |
+|---|---|
+| `docker compose up --build -d` | Start in detached (background) mode |
+| `docker compose logs -f app` | Stream live app logs |
+| `docker compose logs -f postgres` | Stream live database logs |
+| `docker compose down` | Stop and remove containers (data volume preserved) |
+| `docker compose down -v` | Stop containers **and wipe the database volume** |
+| `docker compose build --no-cache` | Force a full image rebuild |
+
+### Services and ports
+
+| Service | Host port | Description |
+|---|---|---|
+| `app` | `8081` | Spring Boot REST API |
+| `postgres` | `5433` | PostgreSQL (mapped to avoid conflict with local Postgres on 5432) |
+
+---
+
 ## API Endpoints
 
 ### `POST /logs` — Ingest a log entry
@@ -319,7 +392,7 @@ The `GroqService.summarize()` method catches all exceptions internally and retur
 
 | Area | Description |
 |---|---|
-| **Docker Compose** | Add a `docker-compose.yml` to spin up the Spring Boot app and PostgreSQL together with a single `docker compose up`, removing all local setup friction |
+| ~~**Docker Compose**~~ | ✅ Done — see [Run with Docker](#run-with-docker) |
 | **Frontend Dashboard** | A React/Next.js UI that visualises clusters on a timeline, colour-codes severity, and displays AI summaries inline |
 | **Elasticsearch / OpenSearch** | Replace PostgreSQL full-table scans with an Elasticsearch index for sub-second aggregations across hundreds of millions of log events |
 | **Parallel AI summarisation** | Use `CompletableFuture` or Java 21 virtual threads to call Groq concurrently for multiple clusters, reducing latency from `O(n × LLM_latency)` to `O(LLM_latency)` |

@@ -1,0 +1,96 @@
+# =============================================================================
+# Docker Compose — Log Intelligence Platform
+# =============================================================================
+#
+# Services:
+#   postgres  — PostgreSQL 16 database with a named volume for data persistence
+#   app       — Spring Boot API built from the project Dockerfile
+#
+# Usage:
+#   export GROQ_API_KEY="gsk_your_key_here"   # Linux/macOS
+#   $env:GROQ_API_KEY = "gsk_your_key_here"   # Windows PowerShell
+#   docker compose up --build
+#
+# The --build flag re-builds the app image when source files change.
+# Omit it on subsequent runs when code hasn't changed (faster startup).
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL database
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16
+    container_name: log_intelligence_db
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB:       log_intelligence   # database name
+      POSTGRES_USER:     loguser            # DB user (used by the app service below)
+      POSTGRES_PASSWORD: logpassword        # DB password — change in production
+
+    ports:
+      # Expose to host for optional direct inspection with psql / pgAdmin.
+      # Remove this mapping in production if external DB access is not needed.
+      - "5433:5432"
+
+    volumes:
+      # Named volume — data persists across container restarts and re-creations.
+      # Run `docker compose down -v` to wipe the database.
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      # pg_isready exits 0 only when PostgreSQL is fully accepting connections.
+      # The app service waits for this before starting (condition: service_healthy).
+      test: ["CMD-SHELL", "pg_isready -U loguser -d log_intelligence"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # Spring Boot application
+  # ---------------------------------------------------------------------------
+  app:
+    build:
+      context: .          # Dockerfile is in the project root
+      dockerfile: Dockerfile
+    container_name: log_intelligence_app
+    restart: unless-stopped
+
+    ports:
+      - "8081:8081"       # Maps host:8081 → container:8081
+
+    environment:
+      # --- Spring profile activates application-docker.properties ---
+      SPRING_PROFILES_ACTIVE: docker
+
+      # --- Database connection (resolves to the postgres service above) ---
+      SPRING_DATASOURCE_URL:      jdbc:postgresql://postgres:5432/log_intelligence
+      SPRING_DATASOURCE_USERNAME: loguser
+      SPRING_DATASOURCE_PASSWORD: logpassword
+
+      # --- Groq AI integration ---
+      # Passed through from the host environment — never hard-coded here.
+      # The app degrades gracefully to "Summary unavailable" if this is unset.
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+
+      # --- Optional JVM tuning ---
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+
+    depends_on:
+      postgres:
+        # Docker Compose waits for the postgres healthcheck to pass before
+        # starting the app container, preventing "Connection refused" errors
+        # during the DB connection pool initialisation.
+        condition: service_healthy
+
+# ---------------------------------------------------------------------------
+# Named volumes
+# ---------------------------------------------------------------------------
+volumes:
+  postgres_data:
+    # Default driver stores data in Docker's managed volume directory.
+    # Data survives container removal; only `docker compose down -v` removes it.
+    driver: local
