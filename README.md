@@ -24,7 +24,7 @@ Log Intelligence Platform solves this by:
 
 ## Demo
 
-![Dashboard Demo](screenshots/demo.gif)
+![Dashboard Demo](demo.gif)
 
 ---
 
