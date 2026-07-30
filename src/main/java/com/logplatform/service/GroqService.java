@@ -2,10 +2,12 @@ package com.logplatform.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.logplatform.config.CacheConfig;
 import com.logplatform.dto.LogClusterResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -78,17 +80,27 @@ public class GroqService {
     /**
      * Generates a 1-2 sentence AI explanation of the given log cluster.
      *
-     * Steps:
-     *   1. Guard-check: if the API key is blank, return the fallback immediately.
-     *   2. Build the SRE-flavoured prompt with cluster metadata embedded.
-     *   3. Serialise the Groq request payload as JSON and fire the HTTP POST.
-     *   4. Parse choices[0].message.content from the response.
-     *   5. On any exception (network, rate limit, parse error), log a warning
-     *      and return FALLBACK_SUMMARY so the calling endpoint never crashes.
+     * Caching:
+     *   @Cacheable stores the result in Redis under a key combining serviceName,
+     *   logLevel, and timeBucketStart.  On a cache hit, the HTTP call to Groq is
+     *   skipped entirely, reducing latency and API rate-limit usage.
+     *
+     *   The 'unless' condition prevents caching the fallback string — if Groq
+     *   failed transiently, we want to retry on the next request rather than
+     *   permanently caching "Summary unavailable" for 1 hour.
+     *
+     *   TTL is configured to 1 hour in CacheConfig.  Cache errors (Redis down)
+     *   are handled by CacheConfig.errorHandler() — they are logged and ignored,
+     *   so the method always runs normally even when Redis is unavailable.
      *
      * @param cluster The log cluster to summarise.
      * @return Plain-English AI summary, or "Summary unavailable" on error.
      */
+    @Cacheable(
+            value  = CacheConfig.GROQ_CACHE,
+            key    = "#cluster.serviceName + ':' + #cluster.logLevel + ':' + #cluster.timeBucketStart",
+            unless = "#result == 'Summary unavailable'"
+    )
     public String summarize(LogClusterResult cluster) {
         if (apiKey == null || apiKey.isBlank()) {
             log.warn("GroqService: GROQ_API_KEY is not set — returning fallback summary.");

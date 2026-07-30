@@ -4,6 +4,7 @@
 #
 # Services:
 #   postgres  — PostgreSQL 16 database with a named volume for data persistence
+#   redis     — Redis 7 (Alpine) for caching Groq AI summaries (1-hour TTL)
 #   app       — Spring Boot API built from the project Dockerfile
 #
 # Usage:
@@ -50,6 +51,29 @@ services:
       start_period: 10s
 
   # ---------------------------------------------------------------------------
+  # Redis — Groq AI summary cache
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: log_intelligence_redis
+    restart: unless-stopped
+
+    ports:
+      # Expose to host so you can inspect the cache with: redis-cli -p 6380
+      - "6380:6379"
+
+    volumes:
+      - redis_data:/data
+
+    healthcheck:
+      # 'redis-cli ping' returns PONG when Redis is accepting commands.
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  # ---------------------------------------------------------------------------
   # Spring Boot application
   # ---------------------------------------------------------------------------
   app:
@@ -76,6 +100,10 @@ services:
       # The app degrades gracefully to "Summary unavailable" if this is unset.
       GROQ_API_KEY: ${GROQ_API_KEY:-}
 
+      # --- Redis cache (resolves to the redis service name via Docker DNS) ---
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
       # --- Optional JVM tuning ---
       JAVA_OPTS: "-Xms256m -Xmx512m"
 
@@ -85,12 +113,18 @@ services:
         # starting the app container, preventing "Connection refused" errors
         # during the DB connection pool initialisation.
         condition: service_healthy
+      redis:
+        # Wait for Redis to accept connections before the app starts,
+        # so the first @Cacheable call doesn't fail on startup.
+        condition: service_healthy
 
 # ---------------------------------------------------------------------------
 # Named volumes
 # ---------------------------------------------------------------------------
 volumes:
   postgres_data:
-    # Default driver stores data in Docker's managed volume directory.
-    # Data survives container removal; only `docker compose down -v` removes it.
+    driver: local
+  redis_data:
+    # Redis data is persisted across container restarts.
+    # Run `docker compose down -v` to clear the cache along with the database.
     driver: local

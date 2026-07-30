@@ -6,6 +6,7 @@ import com.logplatform.repository.LogEntryRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -90,7 +91,7 @@ public class LogClusterService {
                 )));
 
         // --- Step 3: transform each group into a LogClusterResult ------------
-        return grouped.entrySet().stream()
+        List<LogClusterResult> clusters = grouped.entrySet().stream()
                 .map(entry -> {
                     ClusterKey     key     = entry.getKey();
                     List<LogEntry> entries = entry.getValue();
@@ -112,10 +113,82 @@ public class LogClusterService {
                 // Sort by count descending — biggest incident clusters surface first
                 .sorted(Comparator.comparingInt(LogClusterResult::getCount).reversed())
                 .collect(Collectors.toList());
+
+        // --- Step 4: compute anomaly scores (z-score per peer group) ---------
+        computeAnomalyScores(clusters);
+
+        return clusters;
     }
 
     // -------------------------------------------------------------------------
-    // Private helpers
+    // Anomaly scoring — z-score frequency spike detection
+    // -------------------------------------------------------------------------
+
+    /**
+     * Computes a z-score anomaly score for every cluster and sets it in-place.
+     *
+     * Algorithm (lightweight, no ML library required):
+     *   1. Group clusters into "peer groups" by (serviceName, logLevel).
+     *      Peers are clusters of the same service and severity — they represent
+     *      different time windows of the same type of event.
+     *   2. For each peer group with ≥ 2 members, compute:
+     *        mean    = average event count across the group
+     *        stdDev  = population standard deviation of event counts
+     *        z-score = (cluster.count - mean) / stdDev
+     *   3. Round to 2 decimal places and store in the cluster via setAnomalyScore().
+     *
+     * Edge cases:
+     *   - Only 1 cluster in peer group → no peers to compare; score = 0.0
+     *   - All clusters have identical counts → stdDev = 0; score = 0.0
+     *   - Negative z-score → cluster is quieter than usual (not an anomaly)
+     *
+     * Interpretation guide (exposed in API response as "anomalyScore"):
+     *   < 0.0   → quieter than usual
+     *   0.0     → average or singleton
+     *   1.0–1.9 → elevated
+     *   ≥ 2.0   → significant spike (2σ above peer mean) — worth investigating
+     *   ≥ 3.0   → critical spike
+     */
+    private static void computeAnomalyScores(List<LogClusterResult> clusters) {
+
+        // Step 1: group into peer sets by (serviceName:logLevel)
+        Map<String, List<LogClusterResult>> peerGroups = clusters.stream()
+                .collect(Collectors.groupingBy(
+                        c -> c.getServiceName() + ":" + c.getLogLevel()));
+
+        peerGroups.values().forEach(peers -> {
+
+            // Step 2a: need at least 2 peers for a meaningful comparison
+            if (peers.size() < 2) return;
+
+            double[] counts = peers.stream()
+                    .mapToDouble(LogClusterResult::getCount)
+                    .toArray();
+
+            double mean = Arrays.stream(counts).average().orElse(0.0);
+
+            // Population variance: average of squared deviations from mean
+            double variance = Arrays.stream(counts)
+                    .map(x -> Math.pow(x - mean, 2))
+                    .average()
+                    .orElse(0.0);
+
+            double stdDev = Math.sqrt(variance);
+
+            // Step 2b: if all counts are equal (stdDev ≈ 0), no anomaly
+            if (stdDev < 1e-9) return;
+
+            // Step 3: assign z-score to each cluster in the peer group
+            peers.forEach(cluster -> {
+                double z = (cluster.getCount() - mean) / stdDev;
+                // Round to 2 decimal places for clean API output
+                cluster.setAnomalyScore(Math.round(z * 100.0) / 100.0);
+            });
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // Time-bucket helpers
     // -------------------------------------------------------------------------
 
     /**

@@ -16,6 +16,11 @@
 #   container is started alongside the job; environment variables override the
 #   datasource URL so the app connects to it instead of the local default.
 #
+# Redis:
+#   The Redis cache configuration (CacheConfig) creates a RedisCacheManager
+#   bean, which Lettuce connects to lazily.  A Redis 7 Alpine service container
+#   is started alongside the job so contextLoads() succeeds without stubbing.
+#
 # Secrets:
 #   GROQ_API_KEY is set to a dummy value so GroqService starts without failing.
 #   It will return "Summary unavailable" for any AI calls made during tests,
@@ -36,9 +41,8 @@ jobs:
     runs-on: ubuntu-latest
 
     # -------------------------------------------------------------------------
-    # PostgreSQL service container
-    # GitHub Actions starts this container before the job steps run.
-    # The app connects to it via localhost:5432 (mapped from the container).
+    # Service containers — PostgreSQL + Redis
+    # GitHub Actions starts these containers before the job steps run.
     # -------------------------------------------------------------------------
     services:
       postgres:
@@ -56,6 +60,17 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      # Redis 7 Alpine — backs the Spring Cache abstraction in the app context
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     # -------------------------------------------------------------------------
     # Environment variables
     # These override the values in application.properties for CI, pointing
@@ -65,6 +80,9 @@ jobs:
       SPRING_DATASOURCE_URL:      jdbc:postgresql://localhost:5432/ci_test_db
       SPRING_DATASOURCE_USERNAME: ci_user
       SPRING_DATASOURCE_PASSWORD: ci_password
+      # Redis service container is on localhost in the GitHub Actions runner
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
       # Dummy key — GroqService will return "Summary unavailable" gracefully
       GROQ_API_KEY: ci_dummy_key_not_used_in_tests
 

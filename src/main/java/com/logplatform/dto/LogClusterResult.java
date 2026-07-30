@@ -52,6 +52,19 @@ public class LogClusterResult {
      */
     private final List<String> sampleMessages;
 
+    /**
+     * Z-score anomaly metric computed by LogClusterService.
+     *
+     * Interpretation:
+     *   0.0      → average rate (or only one cluster in peer group)
+     *   1.0–2.0  → elevated (1–2 standard deviations above peer mean)
+     *   ≥ 2.0    → significant spike — warrants investigation
+     *   < 0.0    → quieter than usual
+     *
+     * Set to 0.0 by default; populated via setAnomalyScore() after clustering.
+     */
+    private double anomalyScore = 0.0;
+
     // -------------------------------------------------------------------------
     // Constructor
     // -------------------------------------------------------------------------
@@ -72,9 +85,13 @@ public class LogClusterResult {
     // Getters (Jackson uses these to serialise to JSON)
     // -------------------------------------------------------------------------
 
-    public String getServiceName()          { return serviceName; }
-    public String getLogLevel()             { return logLevel; }
+    public String getServiceName()            { return serviceName; }
+    public String getLogLevel()               { return logLevel; }
     public LocalDateTime getTimeBucketStart() { return timeBucketStart; }
-    public int getCount()                   { return count; }
-    public List<String> getSampleMessages() { return sampleMessages; }
+    public int getCount()                     { return count; }
+    public List<String> getSampleMessages()   { return sampleMessages; }
+    public double getAnomalyScore()           { return anomalyScore; }
+
+    /** Called by LogClusterService after z-score computation. */
+    public void setAnomalyScore(double anomalyScore) { this.anomalyScore = anomalyScore; }
 }

@@ -59,6 +59,18 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Spring Cache abstraction – provides @Cacheable, @CacheEvict, @CachePut -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
+
+        <!-- Spring Data Redis + Lettuce client – backs the Spring Cache abstraction -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>

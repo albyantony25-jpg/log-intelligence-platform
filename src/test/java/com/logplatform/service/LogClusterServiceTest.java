@@ -357,4 +357,127 @@ class LogClusterServiceTest {
             assertThat(result.get(0).getCount()).isEqualTo(2);
         }
     }
+
+    // =========================================================================
+    // Anomaly scoring (z-score frequency spike detection)
+    // =========================================================================
+
+    @Nested
+    @DisplayName("anomaly scoring (z-score)")
+    class AnomalyScoring {
+
+        @Test
+        @DisplayName("singleton cluster (no peers) has anomalyScore = 0.0")
+        void computeClusters_singleCluster_anomalyScoreIsZero() {
+            when(logEntryRepository.findAll()).thenReturn(
+                    List.of(entry("payment-service", "ERROR", "Timeout")));
+
+            List<LogClusterResult> result = logClusterService.computeClusters();
+
+            assertThat(result.get(0).getAnomalyScore()).isEqualTo(0.0);
+        }
+
+        @Test
+        @DisplayName("peer clusters with equal counts all have anomalyScore = 0.0")
+        void computeClusters_equalPeerCounts_allScoresZero() {
+            // Two payment-service ERROR clusters in different windows, both count=2
+            when(logEntryRepository.findAll()).thenReturn(List.of(
+                    entry("payment-service", "ERROR", "Err A1", 1),
+                    entry("payment-service", "ERROR", "Err A2", 2),
+                    entry("payment-service", "ERROR", "Err B1", 11),
+                    entry("payment-service", "ERROR", "Err B2", 12)
+            ));
+
+            List<LogClusterResult> result = logClusterService.computeClusters();
+
+            // Two clusters, both count=2, stdDev=0 → all scores = 0.0
+            assertThat(result).hasSize(2);
+            assertThat(result).allMatch(c -> c.getAnomalyScore() == 0.0);
+        }
+
+        @Test
+        @DisplayName("spiker cluster has positive score; quiet cluster has negative score")
+        void computeClusters_spikingCluster_hasHighPositiveScore() {
+            // Cluster A (bucket 10:00): 1 event  — quiet
+            // Cluster B (bucket 10:10): 5 events — spike
+            // mean=(1+5)/2=3, stdDev=2, z(A)=-1.0, z(B)=+1.0
+            when(logEntryRepository.findAll()).thenReturn(List.of(
+                    entry("auth-service", "ERROR", "Quiet",   0),   // count=1 in 10:00 bucket
+                    entry("auth-service", "ERROR", "Spike 1", 10),  // count=5 in 10:10 bucket
+                    entry("auth-service", "ERROR", "Spike 2", 11),
+                    entry("auth-service", "ERROR", "Spike 3", 12),
+                    entry("auth-service", "ERROR", "Spike 4", 13),
+                    entry("auth-service", "ERROR", "Spike 5", 14)
+            ));
+
+            List<LogClusterResult> result = logClusterService.computeClusters();
+
+            // result is sorted count-desc: [bucket 10:10 (count=5), bucket 10:00 (count=1)]
+            LogClusterResult spike = result.get(0);
+            LogClusterResult quiet = result.get(1);
+
+            assertThat(spike.getCount()).isEqualTo(5);
+            assertThat(spike.getAnomalyScore()).isGreaterThan(0.0);
+
+            assertThat(quiet.getCount()).isEqualTo(1);
+            assertThat(quiet.getAnomalyScore()).isLessThan(0.0);
+        }
+
+        @Test
+        @DisplayName("scores are computed independently per (serviceName, logLevel) peer group")
+        void computeClusters_differentPeerGroups_scoredIndependently() {
+            // auth-service ERROR: counts [1, 5] → z-scores will be non-zero
+            // payment-service WARN: only 1 cluster → z-score stays 0.0
+            when(logEntryRepository.findAll()).thenReturn(List.of(
+                    entry("auth-service",    "ERROR", "Auth quiet",  0),
+                    entry("auth-service",    "ERROR", "Auth spike 1", 10),
+                    entry("auth-service",    "ERROR", "Auth spike 2", 11),
+                    entry("auth-service",    "ERROR", "Auth spike 3", 12),
+                    entry("auth-service",    "ERROR", "Auth spike 4", 13),
+                    entry("auth-service",    "ERROR", "Auth spike 5", 14),
+                    entry("payment-service", "WARN",  "Payment warn", 0)
+            ));
+
+            List<LogClusterResult> result = logClusterService.computeClusters();
+
+            // Find the payment-service WARN singleton cluster
+            LogClusterResult paymentWarn = result.stream()
+                    .filter(c -> "payment-service".equals(c.getServiceName()) && "WARN".equals(c.getLogLevel()))
+                    .findFirst().orElseThrow();
+
+            // Singleton cluster in its own peer group → score must remain 0.0
+            assertThat(paymentWarn.getAnomalyScore()).isEqualTo(0.0);
+
+            // auth-service ERROR clusters have 2 peers → at least one non-zero score
+            boolean anyNonZeroAuthScore = result.stream()
+                    .filter(c -> "auth-service".equals(c.getServiceName()))
+                    .anyMatch(c -> c.getAnomalyScore() != 0.0);
+            assertThat(anyNonZeroAuthScore).isTrue();
+        }
+
+        @Test
+        @DisplayName("anomalyScore is rounded to 2 decimal places")
+        void computeClusters_scores_roundedToTwoDecimals() {
+            // Three clusters with counts [1, 3, 5] → non-trivial z-scores
+            when(logEntryRepository.findAll()).thenReturn(List.of(
+                    entry("auth-service", "ERROR", "Low 1",  0),
+                    entry("auth-service", "ERROR", "Mid 1", 10),
+                    entry("auth-service", "ERROR", "Mid 2", 11),
+                    entry("auth-service", "ERROR", "Mid 3", 12),
+                    entry("auth-service", "ERROR", "Hi 1",  20),
+                    entry("auth-service", "ERROR", "Hi 2",  21),
+                    entry("auth-service", "ERROR", "Hi 3",  22),
+                    entry("auth-service", "ERROR", "Hi 4",  23),
+                    entry("auth-service", "ERROR", "Hi 5",  24)
+            ));
+
+            List<LogClusterResult> result = logClusterService.computeClusters();
+
+            result.forEach(c -> {
+                double score = c.getAnomalyScore();
+                double rounded = Math.round(score * 100.0) / 100.0;
+                assertThat(score).isEqualTo(rounded);
+            });
+        }
+    }
 }
