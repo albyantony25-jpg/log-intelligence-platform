@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.logplatform.config.CacheConfig;
 import com.logplatform.dto.LogClusterResult;
+import io.github.bucket4j.Bandwidth;
+import io.github.bucket4j.Bucket;
+import io.github.bucket4j.Refill;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -73,6 +76,30 @@ public class GroqService {
     /** Reused across requests — ObjectMapper is thread-safe after configuration. */
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /**
+     * Token-bucket rate limiter for outbound Groq API calls.
+     *
+     * Limit: 30 tokens per minute, refilled in one batch at the start of each
+     * minute ("intervally" refill — simpler than "greedy" and matches Groq's
+     * RPM quota window).
+     *
+     * Why 30 RPM?
+     *   Groq's free tier allows 30 requests per minute per API key.  Staying
+     *   within this limit avoids HTTP 429 responses and preserves quota for
+     *   legitimate traffic.  Adjust the limit via application.properties if
+     *   you upgrade to a paid tier.
+     *
+     * Thread-safety: Bucket is thread-safe by design (CAS-based internally).
+     */
+    private final Bucket groqRateLimiter = Bucket.builder()
+            .addLimit(
+                    Bandwidth.classic(
+                            30,
+                            Refill.intervally(30, Duration.ofMinutes(1))
+                    )
+            )
+            .build();
+
     // -------------------------------------------------------------------------
     // Public API
     // -------------------------------------------------------------------------
@@ -104,6 +131,16 @@ public class GroqService {
     public String summarize(LogClusterResult cluster) {
         if (apiKey == null || apiKey.isBlank()) {
             log.warn("GroqService: GROQ_API_KEY is not set — returning fallback summary.");
+            return FALLBACK_SUMMARY;
+        }
+
+        // Rate-limit guard: consume one token before making the HTTP call.
+        // If the bucket is empty (30 calls already made this minute), return the
+        // fallback immediately rather than blocking or hitting Groq's 429 limit.
+        if (!groqRateLimiter.tryConsume(1)) {
+            log.warn("GroqService: Rate limit reached ({} req/min) — returning fallback " +
+                     "for cluster [{} / {}] to protect quota.",
+                     30, cluster.getServiceName(), cluster.getLogLevel());
             return FALLBACK_SUMMARY;
         }
 

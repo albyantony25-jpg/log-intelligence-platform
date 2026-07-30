@@ -335,4 +335,30 @@ class GroqServiceTest {
             assertThat(groqService.summarize(sampleCluster)).isEqualTo(FALLBACK);
         }
     }
+
+    // =========================================================================
+    // Rate limiting (Bucket4j token bucket)
+    // =========================================================================
+
+    @Nested
+    @DisplayName("when rate limit is exhausted")
+    class WhenRateLimited {
+
+        @Test
+        @DisplayName("31st call within the same minute returns fallback without HTTP call")
+        void summarize_rateLimitExhausted_returnsFallbackWithoutHttpCall() throws Exception {
+            // The bucket holds 30 tokens. Drain them all by calling summarize() 30 times.
+            // Each call succeeds (HTTP 200 via the default stub).
+            for (int i = 0; i < 30; i++) {
+                groqService.summarize(sampleCluster);
+            }
+
+            // The 31st call should be blocked by the rate limiter — no HTTP call made.
+            String result = groqService.summarize(sampleCluster);
+
+            assertThat(result).isEqualTo(FALLBACK);
+            // Verify exactly 30 HTTP calls were made (one per token), not 31.
+            verify(mockHttpClient, times(30)).send(any(HttpRequest.class), any());
+        }
+    }
 }
