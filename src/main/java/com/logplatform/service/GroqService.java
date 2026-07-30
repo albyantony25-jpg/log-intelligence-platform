@@ -64,7 +64,7 @@ public class GroqService {
     private String apiKey;
 
     /** Reused across requests — HttpClient is thread-safe and connection-pool-aware. */
-    private final HttpClient httpClient = HttpClient.newBuilder()
+    HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
 
