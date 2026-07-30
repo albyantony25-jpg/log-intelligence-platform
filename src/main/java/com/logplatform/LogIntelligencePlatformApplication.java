@@ -2,6 +2,7 @@ package com.logplatform;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableAsync;
 
 /**
  * Entry point for the Log Intelligence Platform.
@@ -14,6 +15,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  *     @Repository / @Controller classes
  */
 @SpringBootApplication
+@EnableAsync   // Activates @Async support for parallel AI summary calls
 public class LogIntelligencePlatformApplication {
 
     public static void main(String[] args) {
