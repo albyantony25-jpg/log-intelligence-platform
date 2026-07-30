@@ -6,6 +6,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?logo=springboot)](https://spring.io/projects/spring-boot)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-316192?logo=postgresql)](https://www.postgresql.org/)
 [![Groq](https://img.shields.io/badge/Groq-Llama%203.3-F55036)](https://console.groq.com/)
+[![CI](https://github.com/albyantony25-jpg/log-intelligence-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/albyantony25-jpg/log-intelligence-platform/actions/workflows/ci.yml)
 
 ---
 

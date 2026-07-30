@@ -1,0 +1,118 @@
+# =============================================================================
+# CI Pipeline — Log Intelligence Platform
+# =============================================================================
+#
+# Triggers on every push and pull request targeting the main branch.
+#
+# What it does:
+#   1. Checks out the source code
+#   2. Sets up JDK 17 (Temurin distribution — same as the Dockerfile runtime)
+#   3. Caches the Maven local repository to speed up subsequent runs
+#   4. Builds the project and runs all tests with the Maven Wrapper
+#
+# Database:
+#   The Spring Boot integration test (contextLoads) starts the full application
+#   context, which requires a live PostgreSQL connection.  A postgres service
+#   container is started alongside the job; environment variables override the
+#   datasource URL so the app connects to it instead of the local default.
+#
+# Secrets:
+#   GROQ_API_KEY is set to a dummy value so GroqService starts without failing.
+#   It will return "Summary unavailable" for any AI calls made during tests,
+#   which is the expected graceful-fallback behaviour.
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    name: Build & Test (JDK 17)
+    runs-on: ubuntu-latest
+
+    # -------------------------------------------------------------------------
+    # PostgreSQL service container
+    # GitHub Actions starts this container before the job steps run.
+    # The app connects to it via localhost:5432 (mapped from the container).
+    # -------------------------------------------------------------------------
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB:       ci_test_db
+          POSTGRES_USER:     ci_user
+          POSTGRES_PASSWORD: ci_password
+        ports:
+          - 5432:5432
+        # Wait until PostgreSQL is fully ready before starting job steps
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    # -------------------------------------------------------------------------
+    # Environment variables
+    # These override the values in application.properties for CI, pointing
+    # the app at the service container instead of a local installation.
+    # -------------------------------------------------------------------------
+    env:
+      SPRING_DATASOURCE_URL:      jdbc:postgresql://localhost:5432/ci_test_db
+      SPRING_DATASOURCE_USERNAME: ci_user
+      SPRING_DATASOURCE_PASSWORD: ci_password
+      # Dummy key — GroqService will return "Summary unavailable" gracefully
+      GROQ_API_KEY: ci_dummy_key_not_used_in_tests
+
+    steps:
+      # -----------------------------------------------------------------------
+      # Step 1: Check out the repository
+      # -----------------------------------------------------------------------
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # Step 2: Set up JDK 17
+      # Using Temurin (Eclipse Adoptium) — the same distro as the Dockerfile
+      # runtime image (eclipse-temurin:17-jre).
+      # -----------------------------------------------------------------------
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          # Enable Maven dependency caching — dramatically speeds up
+          # subsequent workflow runs once the cache is warm.
+          cache: maven
+
+      # -----------------------------------------------------------------------
+      # Step 3: Make the Maven Wrapper executable
+      # The wrapper script ships without the execute bit on Windows checkouts;
+      # this ensures it's runnable on the Linux runner.
+      # -----------------------------------------------------------------------
+      - name: Make Maven Wrapper executable
+        run: chmod +x mvnw
+
+      # -----------------------------------------------------------------------
+      # Step 4: Build and run tests
+      # --batch-mode  suppresses interactive progress output (cleaner CI logs)
+      # verify        compiles, runs tests, and packages the JAR
+      # -----------------------------------------------------------------------
+      - name: Build with Maven and run tests
+        run: ./mvnw --batch-mode verify
+
+      # -----------------------------------------------------------------------
+      # Step 5: Upload build artifact (the packaged JAR)
+      # Stored for 7 days — useful for debugging or deploying from CI.
+      # -----------------------------------------------------------------------
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: log-intelligence-platform-jar
+          path: target/*.jar
+          retention-days: 7
