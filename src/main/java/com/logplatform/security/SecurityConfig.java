@@ -33,8 +33,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable()) // Stateless APIs do not need CSRF protection
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll() // Allow CORS pre-flight
-                        .requestMatchers("/auth/login").permitAll() // Open login endpoint
-                        .requestMatchers("/actuator/health").permitAll() // Open health endpoint
+                        .requestMatchers("/auth/login", "/actuator/health", "/simulate/**").permitAll() // Open login endpoint
                         .anyRequest().authenticated()               // Protect everything else (/logs/**)
                 )
                 // Do not create HTTP sessions; every request must carry a token
