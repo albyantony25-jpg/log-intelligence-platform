@@ -191,34 +191,51 @@ export default function App() {
           </div>
         )}
 
-        {/* 5. Loading skeleton */}
-        {loading && <LoadingSkeleton />}
-
-        {/* 6. Empty state */}
-        {!loading && !error && filteredClusters.length === 0 && (
-          <EmptyState filtered={filter !== 'ALL'} />
-        )}
-
-        {/* 3. Cluster feed — stagger-animated cards */}
-        {!loading && !error && filteredClusters.length > 0 && (
-          /*
-           * motion.div with staggerChildren causes each child card to
-           * animate in 80ms after the previous one, creating the cascade.
-           * AnimatePresence handles cards smoothly entering/exiting when
-           * the filter changes.
-           */
-          <div
-            key={filter}   // re-trigger stagger animation when filter changes
-            className="space-y-4"
-          >
-            {filteredClusters.map((cluster, i) => (
-              <ClusterCard
-                key={`${cluster.serviceName}-${cluster.logLevel}-${cluster.timeBucketStart}-${i}`}
-                cluster={cluster}
-              />
-            ))}
-          </div>
-        )}
+        {/* 4. Main Feed — clusters list or empty state */}
+        <AnimatePresence mode="wait">
+          {loading ? (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <LoadingSkeleton />
+            </motion.div>
+          ) : filteredClusters.length === 0 ? (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="py-16 text-center bg-surface border border-dashed border-border rounded-xl"
+            >
+              <div className="w-12 h-12 bg-raised rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-6 h-6 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-white mb-1">All clear</h3>
+              <p className="text-sm text-dim">No anomalies detected for the selected filter.</p>
+            </motion.div>
+          ) : (
+            <motion.div
+              key={filter}
+              initial={{ opacity: 0, x: -15 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 15 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-4"
+            >
+              {filteredClusters.map((cluster, i) => (
+                <ClusterCard
+                  key={`${cluster.serviceName}-${cluster.logLevel}-${cluster.timeBucketStart}-${i}`}
+                  cluster={cluster}
+                />
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Footer */}
         {!loading && (
