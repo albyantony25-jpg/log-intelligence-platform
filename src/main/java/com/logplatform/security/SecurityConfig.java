@@ -34,6 +34,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll() // Allow CORS pre-flight
                         .requestMatchers("/auth/login").permitAll() // Open login endpoint
+                        .requestMatchers("/actuator/health").permitAll() // Open health endpoint
                         .anyRequest().authenticated()               // Protect everything else (/logs/**)
                 )
                 // Do not create HTTP sessions; every request must carry a token

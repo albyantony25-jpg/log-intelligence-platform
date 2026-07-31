@@ -22,7 +22,8 @@ import org.springframework.stereotype.Repository;
  *   List<LogEntry> findByLogLevel(String logLevel);
  *   List<LogEntry> findByServiceNameAndLogLevel(String serviceName, String level);
  */
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+
 @Repository
-public interface LogEntryRepository extends JpaRepository<LogEntry, Long> {
-    // Additional derived query methods can be declared here as needed.
+public interface LogEntryRepository extends JpaRepository<LogEntry, Long>, JpaSpecificationExecutor<LogEntry> {
 }

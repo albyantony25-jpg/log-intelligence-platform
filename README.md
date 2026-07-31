@@ -291,25 +291,58 @@ Or simply start your local `LogGenerator` against the exposed port — the API i
 
 ---
 
-### `GET /logs` — Retrieve all log entries
+### `GET /logs` — Retrieve log entries
 
 | | |
 |---|---|
 | **Method** | `GET` |
 | **Path** | `/logs` |
-| **Description** | Returns all stored log entries as a JSON array. |
+| **Description** | Returns a paginated list of stored log entries. Supports optional filtering by `serviceName` and `logLevel`. |
+
+**Query Parameters:**
+- `page` (integer) — Page number to retrieve (0-indexed, default: 0)
+- `size` (integer) — Number of records per page (default: 20)
+- `serviceName` (string) — Filter by service
+- `logLevel` (string) — Filter by severity (e.g., `ERROR`)
+
+**Example Request:** `GET /logs?page=0&size=20&serviceName=payment-service&logLevel=ERROR`
 
 **Response `200 OK`:**
 ```json
-[
-  {
-    "id":          1,
-    "serviceName": "payment-service",
-    "logLevel":    "ERROR",
-    "message":     "Payment gateway timeout for transaction txn_4823 after 4200ms",
-    "timestamp":   "2024-01-15T10:03:00"
-  }
-]
+{
+  "content": [
+    {
+      "id":          1,
+      "serviceName": "payment-service",
+      "logLevel":    "ERROR",
+      "message":     "Payment gateway timeout for transaction txn_4823 after 4200ms",
+      "timestamp":   "2024-01-15T10:03:00"
+    }
+  ],
+  "pageable": {
+    "pageNumber": 0,
+    "pageSize": 20
+  },
+  "totalElements": 1,
+  "totalPages": 1
+}
+```
+
+---
+
+### `GET /actuator/health` — Platform Health Check
+
+| | |
+|---|---|
+| **Method** | `GET` |
+| **Path** | `/actuator/health` |
+| **Description** | Returns the health status of the application and its dependencies (e.g., PostgreSQL, Redis). |
+
+**Response `200 OK`:**
+```json
+{
+  "status": "UP"
+}
 ```
 
 ---

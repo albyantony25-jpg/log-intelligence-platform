@@ -8,6 +8,9 @@ import com.logplatform.service.GroqService;
 import com.logplatform.service.LogClusterService;
 import com.logplatform.service.LogIngestionService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -78,17 +81,32 @@ public class LogEntryController {
     // -------------------------------------------------------------------------
 
     /**
-     * Retrieves all log entries from the database and returns them as a JSON array.
+     * Retrieves log entries from the database with pagination and optional filtering.
      *
-     * Returns HTTP 200 OK with the list (empty array [] if no entries exist yet).
+     * Example: GET /logs?page=0&size=20&serviceName=auth-service&logLevel=ERROR
      *
-     * For production use, consider adding pagination via Pageable to avoid
-     * returning unbounded result sets.
+     * @param serviceName Optional filter by service name.
+     * @param logLevel    Optional filter by severity.
+     * @param pageable    Injected by Spring MVC (defaults if not provided).
+     * @return HTTP 200 OK with a paginated wrapper containing the log entries.
      */
     @GetMapping
-    public ResponseEntity<List<LogEntry>> getAllLogEntries() {
-        List<LogEntry> entries = logEntryRepository.findAll();
-        return ResponseEntity.ok(entries);
+    public ResponseEntity<Page<LogEntry>> getAllLogEntries(
+            @RequestParam(required = false) String serviceName,
+            @RequestParam(required = false) String logLevel,
+            Pageable pageable) {
+
+        Specification<LogEntry> spec = Specification.where(null);
+        
+        if (serviceName != null && !serviceName.isBlank()) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("serviceName"), serviceName));
+        }
+        if (logLevel != null && !logLevel.isBlank()) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("logLevel"), logLevel));
+        }
+
+        Page<LogEntry> page = logEntryRepository.findAll(spec, pageable);
+        return ResponseEntity.ok(page);
     }
 
     // -------------------------------------------------------------------------
