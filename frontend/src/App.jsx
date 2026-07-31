@@ -23,8 +23,10 @@
  *   error        — string | null, set if the API call fails
  *   filter       — 'ALL' | 'ERROR' | 'WARN', controls which clusters are shown
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Client } from '@stomp/stompjs'
+import SockJS from 'sockjs-client/dist/sockjs'
 
 import Header        from './components/Header'
 import LiveTicker    from './components/LiveTicker'
@@ -48,15 +50,24 @@ export default function App() {
   useEffect(() => {
     let cancelled = false   // prevents state update if the component unmounts mid-fetch
 
+    const fetchClusters = async () => {
+      try {
+        const clustersRes = await fetch(`${API_BASE}/api/logs/clusters/summary`)
+        if (!clustersRes.ok) throw new Error(`Clusters endpoint: HTTP ${clustersRes.status}`)
+        const clustersData = await clustersRes.json()
+        if (!cancelled) setClusters(clustersData)
+      } catch (err) {
+        console.error("Failed to fetch clusters", err)
+      }
+    }
+
     const fetchData = async () => {
       try {
-        // Fire both requests at the same time — no need to wait for one before the other
         const [clustersRes, logsRes] = await Promise.all([
           fetch(`${API_BASE}/api/logs/clusters/summary`),
           fetch(`${API_BASE}/api/logs`),
         ])
 
-        // Throw on non-2xx responses so the catch block handles them uniformly
         if (!clustersRes.ok) throw new Error(`Clusters endpoint: HTTP ${clustersRes.status}`)
         if (!logsRes.ok)     throw new Error(`Logs endpoint: HTTP ${logsRes.status}`)
 
@@ -78,7 +89,25 @@ export default function App() {
     }
 
     fetchData()
-    return () => { cancelled = true }
+
+    // WebSocket for cluster updates
+    const socketUrl = 'http://localhost:8081/ws-logs'
+    const stompClient = new Client({
+      webSocketFactory: () => new SockJS(socketUrl),
+      reconnectDelay: 5000,
+      onConnect: () => {
+        stompClient.subscribe('/topic/clusters', (message) => {
+          // When a cluster updates (e.g. log count increases), re-fetch clusters
+          fetchClusters()
+        })
+      }
+    })
+    stompClient.activate()
+
+    return () => { 
+      cancelled = true 
+      stompClient.deactivate()
+    }
   }, [])
 
   /* ---- Derived state ------------------------------------------------------ */

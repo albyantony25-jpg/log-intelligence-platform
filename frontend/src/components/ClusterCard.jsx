@@ -18,8 +18,9 @@
  *   cluster (object) — a LogClusterSummary from the API:
  *     { serviceName, logLevel, timeBucketStart, count, sampleMessages, aiSummary }
  */
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
+import anime from 'animejs'
 
 /* Framer-motion variants shared with the parent container in App.jsx.
    The parent uses staggerChildren so each card's "visible" animation fires
@@ -90,6 +91,25 @@ const SEVERITY = {
 export default function ClusterCard({ cluster }) {
   // Controls whether sample messages are visible
   const [expanded, setExpanded] = useState(false)
+  const prevCount = useRef(cluster.count)
+  const cardRef = useRef(null)
+
+  useEffect(() => {
+    if (cluster.count > prevCount.current) {
+      // Flash the card border when a new log is added
+      if (cardRef.current) {
+        anime({
+          targets: cardRef.current,
+          boxShadow: [
+            { value: `0 0 0px 0px ${SEVERITY[cluster.logLevel]?.badgeBorder.match(/rgba\(.*\)/)?.[0] || 'rgba(255,255,255,0.5)'}`, duration: 0 },
+            { value: `0 0 15px 2px ${SEVERITY[cluster.logLevel]?.badgeBorder.match(/rgba\(.*\)/)?.[0] || 'rgba(255,255,255,0.5)'}`, duration: 400, easing: 'easeOutExpo' },
+            { value: '0 0 0px 0px rgba(0,0,0,0)', duration: 800, easing: 'easeInSine' }
+          ]
+        })
+      }
+      prevCount.current = cluster.count
+    }
+  }, [cluster.count, cluster.logLevel])
 
   const sev     = SEVERITY[cluster.logLevel] || SEVERITY.WARN
   const bucketStart = formatTime(cluster.timeBucketStart)
@@ -99,6 +119,7 @@ export default function ClusterCard({ cluster }) {
 
   return (
     <motion.div
+      ref={cardRef}
       variants={cardVariants}
       className={`
         bg-surface rounded-xl p-5 cursor-default
