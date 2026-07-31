@@ -6,6 +6,7 @@ import com.logplatform.model.LogEntry;
 import com.logplatform.repository.LogEntryRepository;
 import com.logplatform.service.GroqService;
 import com.logplatform.service.LogClusterService;
+import com.logplatform.service.LogIngestionService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -32,17 +33,19 @@ import java.util.stream.Collectors;
 public class LogEntryController {
 
     private final LogEntryRepository logEntryRepository;
+    private final LogIngestionService logIngestionService;
     private final LogClusterService  logClusterService;
     private final GroqService        groqService;
 
     /**
-     * Spring injects all three dependencies via this constructor.
-     * No @Autowired annotation needed — Spring auto-detects single constructors.
+     * Spring injects dependencies via this constructor.
      */
     public LogEntryController(LogEntryRepository logEntryRepository,
+                              LogIngestionService logIngestionService,
                               LogClusterService  logClusterService,
                               GroqService        groqService) {
         this.logEntryRepository = logEntryRepository;
+        this.logIngestionService = logIngestionService;
         this.logClusterService  = logClusterService;
         this.groqService        = groqService;
     }
@@ -62,12 +65,12 @@ public class LogEntryController {
      *
      * @RequestBody – deserialises the incoming JSON payload into a LogEntry object.
      *
-     * Returns HTTP 201 Created on success.
+     * Returns HTTP 202 Accepted on success since processing is asynchronous.
      */
     @PostMapping
-    public ResponseEntity<LogEntry> createLogEntry(@Valid @RequestBody LogEntry logEntry) {
-        LogEntry savedEntry = logEntryRepository.save(logEntry);
-        return ResponseEntity.status(HttpStatus.CREATED).body(savedEntry);
+    public ResponseEntity<Void> createLogEntry(@Valid @RequestBody LogEntry logEntry) {
+        logIngestionService.ingestLog(logEntry);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).build();
     }
 
     // -------------------------------------------------------------------------
