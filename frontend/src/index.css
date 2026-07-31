@@ -52,6 +52,15 @@ body {
   animation: shimmer 1.6s ease-in-out infinite;
 }
 
+@keyframes shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+
 /* --- Card glow utilities ------------------------------------------------- */
 .glow-error {
   box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.25),
