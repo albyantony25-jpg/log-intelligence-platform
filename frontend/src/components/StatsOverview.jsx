@@ -37,24 +37,28 @@ import { animate } from 'animejs'
 function StatCard({ label, value, icon, accentColor, loading }) {
   // counterRef points to the <span> that displays the animated number
   const counterRef = useRef(null)
+  const prevValueRef = useRef(0)
 
-  // Run the count-up animation whenever `value` changes from 0 → real data
+  // Run the count-up animation whenever `value` changes
   useEffect(() => {
     if (loading || !counterRef.current) return
 
-    const obj = { val: 0 }
+    const obj = { val: prevValueRef.current }
 
     // animejs v4: animate(target, keyframes, options)
     // We animate a plain JS object and write its value into the DOM each frame.
     animate(obj, {
       val: value,
-      duration: 1500,
+      duration: prevValueRef.current === 0 ? 1500 : 500, // Faster if it's just an update
       ease: 'outExpo',          // v4 uses 'ease' (not 'easing') and shorthand names
       onUpdate: () => {
         if (counterRef.current) {
           counterRef.current.textContent = Math.round(obj.val).toLocaleString()
         }
       },
+      onComplete: () => {
+        prevValueRef.current = value
+      }
     })
   }, [value, loading])
 

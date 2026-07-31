@@ -142,7 +142,7 @@ export default function App() {
         <Header apiConnected={!loading && !error} />
 
         {/* Live Ticker for incoming logs */}
-        <LiveTicker />
+        <LiveTicker onNewLog={() => setTotalLogs(prev => prev + 1)} />
 
         {/* 2. Stats overview — 4 cards with anime.js count-up */}
         <StatsOverview

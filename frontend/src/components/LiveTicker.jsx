@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client/dist/sockjs'
 
-export default function LiveTicker() {
+export default function LiveTicker({ onNewLog }) {
   const [logs, setLogs] = useState([])
 
   useEffect(() => {
@@ -22,6 +22,7 @@ export default function LiveTicker() {
             const newLog = JSON.parse(message.body)
             // Add to the top, keep only the latest 10 logs
             setLogs((prevLogs) => [newLog, ...prevLogs].slice(0, 10))
+            if (onNewLog) onNewLog()
           }
         })
       },
