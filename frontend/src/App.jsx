@@ -27,6 +27,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 import Header        from './components/Header'
+import LiveTicker    from './components/LiveTicker'
 import StatsOverview from './components/StatsOverview'
 import FilterBar     from './components/FilterBar'
 import ClusterCard   from './components/ClusterCard'
@@ -110,6 +111,9 @@ export default function App() {
 
         {/* 1. Header — title, tagline, live status dot */}
         <Header apiConnected={!loading && !error} />
+
+        {/* Live Ticker for incoming logs */}
+        <LiveTicker />
 
         {/* 2. Stats overview — 4 cards with anime.js count-up */}
         <StatsOverview
