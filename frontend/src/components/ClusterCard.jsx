@@ -19,21 +19,26 @@
  *     { serviceName, logLevel, timeBucketStart, count, sampleMessages, aiSummary }
  */
 import { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import anime from 'animejs'
 
 /* Framer-motion variants shared with the parent container in App.jsx.
    The parent uses staggerChildren so each card's "visible" animation fires
    80ms after the previous card's, creating a cascade/stagger effect. */
-export const cardVariants = {
-  hidden:  { opacity: 0, y: 18, scale: 0.98 },
+export const getCardVariants = (shouldReduceMotion) => ({
+  hidden:  { opacity: 0, y: shouldReduceMotion ? 0 : 20, scale: shouldReduceMotion ? 1 : 0.95 },
   visible: {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: { duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] },
+    transition: { 
+      type: shouldReduceMotion ? 'tween' : 'spring',
+      damping: 20,
+      stiffness: 250,
+      duration: shouldReduceMotion ? 0.3 : undefined
+    },
   },
-}
+})
 
 /* ---- Helpers ------------------------------------------------------------ */
 
@@ -91,6 +96,7 @@ const SEVERITY = {
 export default function ClusterCard({ cluster }) {
   // Controls whether sample messages are visible
   const [expanded, setExpanded] = useState(false)
+  const shouldReduceMotion = useReducedMotion()
   const prevCount = useRef(cluster.count)
   const cardRef = useRef(null)
 
@@ -121,7 +127,10 @@ export default function ClusterCard({ cluster }) {
     <motion.div
       layout
       ref={cardRef}
-      variants={cardVariants}
+      variants={getCardVariants(shouldReduceMotion)}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, margin: "-50px" }}
       onClick={() => setExpanded(!expanded)}
       className={`
         bg-surface rounded-xl p-5 cursor-pointer

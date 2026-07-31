@@ -207,14 +207,8 @@ export default function App() {
            * AnimatePresence handles cards smoothly entering/exiting when
            * the filter changes.
            */
-          <motion.div
+          <div
             key={filter}   // re-trigger stagger animation when filter changes
-            initial="hidden"
-            animate="visible"
-            variants={{
-              hidden:  {},
-              visible: { transition: { staggerChildren: 0.08 } },
-            }}
             className="space-y-4"
           >
             {filteredClusters.map((cluster, i) => (
@@ -223,7 +217,7 @@ export default function App() {
                 cluster={cluster}
               />
             ))}
-          </motion.div>
+          </div>
         )}
 
         {/* Footer */}
