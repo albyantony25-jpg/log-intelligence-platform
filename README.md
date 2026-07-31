@@ -31,40 +31,15 @@ Log Intelligence Platform solves this by:
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                        Client / Service                          │
-│              (your microservices, LogGenerator tool)             │
-└────────────────────────────┬─────────────────────────────────────┘
-                             │  POST /logs  (JSON)
-                             ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                    Spring Boot REST API                          │
-│                    LogEntryController                            │
-└────────────────────────────┬─────────────────────────────────────┘
-                             │  JPA / Hibernate
-                             ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                      PostgreSQL Database                         │
-│                    (log_entries table)                           │
-└────────────────────────────┬─────────────────────────────────────┘
-                             │  findAll()
-                             ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                    LogClusterService                             │
-│   Filter WARN/ERROR → Group by service + level + 10-min bucket  │
-│              → Sort by count descending                          │
-└────────────────────────────┬─────────────────────────────────────┘
-                             │  LogClusterResult list
-                             ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                       GroqService                                │
-│     Build SRE prompt → POST to Groq API (Llama 3.3 70B)        │
-│              → Parse AI response → aiSummary                    │
-└────────────────────────────┬─────────────────────────────────────┘
-                             │  JSON response
-                             ▼
-                    GET /logs/clusters/summary
+```mermaid
+graph TD
+    Client["Client / Service"] -->|POST /logs| API["Spring Boot REST API"]
+    API -->|JPA / Hibernate| DB[("PostgreSQL Database")]
+    DB -->|findAll| Cluster["LogClusterService"]
+    Cluster -->|LogClusterResult list| Groq["GroqService"]
+    Groq -->|POST to Groq API| LLM["Groq Llama 3.3 70B"]
+    LLM -->|aiSummary| Groq
+    Groq -->|JSON response| Client_Query["Client GET /logs/clusters/summary"]
 ```
 
 ---
