@@ -9,7 +9,8 @@
  *   filter    (string)   — currently active filter: 'ALL' | 'ERROR' | 'WARN'
  *   setFilter (function) — setter from useState in App
  *   counts    (object)   — { all, error, warn } cluster counts for badge labels
- */
+import { motion, AnimatePresence } from 'framer-motion'
+
 export default function FilterBar({ filter, setFilter, counts }) {
   const buttons = [
     {
@@ -36,35 +37,63 @@ export default function FilterBar({ filter, setFilter, counts }) {
   ]
 
   return (
-    <div className="flex items-center gap-2 mb-6">
-      <span className="text-xs text-dim font-medium mr-1">Filter by severity:</span>
+    <motion.div layout className="flex items-center gap-2 mb-6 flex-wrap">
+      <motion.span layout className="text-xs text-dim font-medium mr-1">Filter by severity:</motion.span>
 
-      {buttons.map(({ label, value, count, activeClass, countClass }) => {
-        const isActive = filter === value
-        return (
-          <button
-            key={value}
-            onClick={() => setFilter(value)}
-            className={`
-              flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold
-              transition-all duration-150 cursor-pointer
-              ${isActive
-                ? activeClass
-                : 'bg-surface border-border text-dim hover:border-muted hover:text-white'
-              }
-            `}
+      <AnimatePresence mode="popLayout">
+        {buttons.map(({ label, value, count, activeClass, countClass }) => {
+          const isActive = filter === value
+          return (
+            <motion.button
+              layout
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              key={value}
+              onClick={() => setFilter(value)}
+              className={`
+                flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold
+                transition-all duration-150 cursor-pointer relative
+                ${isActive
+                  ? activeClass
+                  : 'bg-surface border-border text-dim hover:border-muted hover:text-white'
+                }
+              `}
+            >
+              {isActive && (
+                <motion.div
+                  layoutId="activeFilterGlow"
+                  className="absolute inset-0 rounded-lg bg-white opacity-5"
+                />
+              )}
+              <span className="relative z-10">{label}</span>
+              {/* Count badge */}
+              <span className={`
+                relative z-10 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold
+                ${isActive ? countClass : 'bg-raised text-muted'}
+              `}>
+                {count}
+              </span>
+            </motion.button>
+          )
+        })}
+
+        {filter !== 'ALL' && (
+          <motion.button
+            layout
+            initial={{ opacity: 0, x: -10, scale: 0.8 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.15 } }}
+            onClick={() => setFilter('ALL')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface text-xs font-semibold text-dim hover:text-white hover:bg-raised transition-colors ml-2"
           >
-            {label}
-            {/* Count badge */}
-            <span className={`
-              px-1.5 py-0.5 rounded text-[10px] font-mono font-bold
-              ${isActive ? countClass : 'bg-raised text-muted'}
-            `}>
-              {count}
-            </span>
-          </button>
-        )
-      })}
-    </div>
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Clear Filter
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </motion.div>
   )
 }
