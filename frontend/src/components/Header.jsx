@@ -9,6 +9,8 @@
  *   apiConnected (boolean) — true once data has loaded without error
  */
 
+import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import SimulatorControl from './SimulatorControl'
 
 /**
@@ -16,6 +18,24 @@ import SimulatorControl from './SimulatorControl'
  * scales and fades a copy of the dot outward — a clean "live" indicator.
  */
 export default function Header({ apiConnected }) {
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('theme') !== 'light' // default to dark
+    }
+    return true
+  })
+
+  useEffect(() => {
+    const root = document.documentElement
+    if (isDark) {
+      root.classList.add('dark')
+      localStorage.setItem('theme', 'dark')
+    } else {
+      root.classList.remove('dark')
+      localStorage.setItem('theme', 'light')
+    }
+  }, [isDark])
+
   return (
     <header className="mb-10">
       {/* Top bar: title + status indicator */}
@@ -40,8 +60,43 @@ export default function Header({ apiConnected }) {
           </p>
         </div>
 
-        {/* Right side: Simulator Control + Live status pill */}
+        {/* Right side: Theme Toggle + Simulator Control + Live status pill */}
         <div className="flex items-center gap-3 mt-1">
+          {/* Theme Toggle Button */}
+          <button
+            onClick={() => setIsDark(!isDark)}
+            className="w-8 h-8 rounded-full bg-surface border border-border flex items-center justify-center text-dim hover:text-white transition-colors relative"
+            aria-label="Toggle theme"
+          >
+            <AnimatePresence mode="wait" initial={false}>
+              {isDark ? (
+                <motion.svg
+                  key="moon"
+                  initial={{ opacity: 0, rotate: -90 }}
+                  animate={{ opacity: 1, rotate: 0 }}
+                  exit={{ opacity: 0, rotate: 90 }}
+                  transition={{ duration: 0.15 }}
+                  className="w-4 h-4 absolute"
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </motion.svg>
+              ) : (
+                <motion.svg
+                  key="sun"
+                  initial={{ opacity: 0, rotate: -90 }}
+                  animate={{ opacity: 1, rotate: 0 }}
+                  exit={{ opacity: 0, rotate: 90 }}
+                  transition={{ duration: 0.15 }}
+                  className="w-4 h-4 absolute text-amber-500"
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </motion.svg>
+              )}
+            </AnimatePresence>
+          </button>
+
           <SimulatorControl />
           
           <div className="flex items-center gap-2 bg-surface border border-border rounded-full px-3 py-1.5 flex-shrink-0">

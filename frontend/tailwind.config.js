@@ -4,16 +4,18 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg:       '#0a0a0f',
-        surface:  '#13131a',
-        raised:   '#1c1c27',
-        border:   '#2a2a3a',
-        muted:    '#3f3f5a',
-        dim:      '#64748b',
-        error:    '#ef4444',
-        warn:     '#f59e0b',
-        success:  '#22c55e',
-        accent:   '#818cf8',
+        bg:       'var(--color-bg)',
+        surface:  'var(--color-surface)',
+        raised:   'var(--color-raised)',
+        border:   'var(--color-border)',
+        muted:    'var(--color-muted)',
+        dim:      'var(--color-dim)',
+        error:    'var(--color-error)',
+        warn:     'var(--color-warn)',
+        success:  'var(--color-success)',
+        accent:   'var(--color-accent)',
+        text:     'var(--color-text)',
+        white:    'var(--color-text)',
       },
       fontFamily: {
         mono: ['"JetBrains Mono"', 'Menlo', 'Monaco', 'Courier New', 'monospace'],
