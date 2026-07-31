@@ -19,7 +19,7 @@
  *     { serviceName, logLevel, timeBucketStart, count, sampleMessages, aiSummary }
  */
 import { useState, useEffect, useRef } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import anime from 'animejs'
 
 /* Framer-motion variants shared with the parent container in App.jsx.
@@ -119,11 +119,13 @@ export default function ClusterCard({ cluster }) {
 
   return (
     <motion.div
+      layout
       ref={cardRef}
       variants={cardVariants}
+      onClick={() => setExpanded(!expanded)}
       className={`
-        bg-surface rounded-xl p-5 cursor-default
-        transition-all duration-200 ${sev.glowClass}
+        bg-surface rounded-xl p-5 cursor-pointer
+        transition-all duration-200 ${sev.glowClass} hover:border-slate-600 border border-transparent
       `}
     >
       {/* ---- Top row: service name + badge -------------------------------- */}
@@ -138,13 +140,20 @@ export default function ClusterCard({ cluster }) {
           </span>
         </div>
 
-        {/* Severity badge */}
-        <span className={`
-          flex-shrink-0 px-2.5 py-0.5 rounded-full border text-[11px] font-bold tracking-wide
-          ${sev.badgeBg} ${sev.badgeText} ${sev.badgeBorder}
-        `}>
-          {cluster.logLevel}
-        </span>
+        {/* Severity badge & Anomaly Score */}
+        <div className="flex items-center gap-2">
+          {cluster.anomalyScore !== undefined && (
+            <span className="text-xs text-dim font-mono bg-[rgba(255,255,255,0.05)] px-2 py-0.5 rounded border border-border">
+              z-score: {cluster.anomalyScore}
+            </span>
+          )}
+          <span className={`
+            flex-shrink-0 px-2.5 py-0.5 rounded-full border text-[11px] font-bold tracking-wide
+            ${sev.badgeBg} ${sev.badgeText} ${sev.badgeBorder}
+          `}>
+            {cluster.logLevel}
+          </span>
+        </div>
       </div>
 
       {/* ---- Count + time bucket ----------------------------------------- */}
@@ -209,19 +218,26 @@ export default function ClusterCard({ cluster }) {
           </button>
 
           {/* Messages list — rendered only when expanded */}
-          {expanded && (
-            <div className="space-y-1.5 mt-2 pl-1">
-              {cluster.sampleMessages.map((msg, i) => (
-                <div
-                  key={i}
-                  className="log-message text-slate-400 bg-raised rounded px-3 py-2 border border-border"
-                >
-                  <span className="text-muted mr-2 select-none">{String(i + 1).padStart(2, '0')}.</span>
-                  {msg}
-                </div>
-              ))}
-            </div>
-          )}
+          <AnimatePresence>
+            {expanded && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="space-y-1.5 mt-2 pl-1 overflow-hidden"
+              >
+                {cluster.sampleMessages.map((msg, i) => (
+                  <div
+                    key={i}
+                    className="log-message text-slate-400 bg-raised rounded px-3 py-2 border border-border"
+                  >
+                    <span className="text-muted mr-2 select-none">{String(i + 1).padStart(2, '0')}.</span>
+                    {msg}
+                  </div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
     </motion.div>
