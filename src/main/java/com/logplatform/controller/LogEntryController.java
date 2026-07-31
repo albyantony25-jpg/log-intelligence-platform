@@ -4,71 +4,70 @@ import com.logplatform.dto.LogClusterResult;
 import com.logplatform.dto.LogClusterSummary;
 import com.logplatform.model.LogEntry;
 import com.logplatform.repository.LogEntryRepository;
-import com.logplatform.service.AsyncGroqService;
+import com.logplatform.service.GroqService;
 import com.logplatform.service.LogClusterService;
 import jakarta.validation.Valid;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * REST controller that exposes the /logs HTTP endpoints.
  *
  * Endpoints:
- *   POST /logs                  – ingest a new log entry (202 Accepted, non-blocking)
+ *   POST /logs                  – ingest a new log entry
  *   GET  /logs                  – retrieve all log entries
  *   GET  /logs/clusters         – WARN/ERROR clusters (service + level + 10-min bucket)
- *   GET  /logs/clusters/summary – clusters enriched with parallel AI summaries
+ *   GET  /logs/clusters/summary – same clusters, each enriched with a Groq AI summary
  *
- * Async design (GET /logs/clusters/summary):
- *   Previously: N clusters × sequential Groq call ≈ N × 1–2 s latency
- *   Now:        All N Groq calls fired in parallel via AsyncGroqService;
- *               total latency ≈ slowest single call (~1–2 s regardless of N)
+ * The controller is intentionally thin: it handles HTTP concerns only
+ * (routing, serialisation, status codes).  Business logic lives in
+ * dedicated service classes.
  */
 @RestController
 @RequestMapping("/logs")
 public class LogEntryController {
 
-    private static final Logger log = LoggerFactory.getLogger(LogEntryController.class);
-
     private final LogEntryRepository logEntryRepository;
     private final LogClusterService  logClusterService;
-    private final AsyncGroqService   asyncGroqService;
+    private final GroqService        groqService;
 
+    /**
+     * Spring injects all three dependencies via this constructor.
+     * No @Autowired annotation needed — Spring auto-detects single constructors.
+     */
     public LogEntryController(LogEntryRepository logEntryRepository,
                               LogClusterService  logClusterService,
-                              AsyncGroqService   asyncGroqService) {
+                              GroqService        groqService) {
         this.logEntryRepository = logEntryRepository;
         this.logClusterService  = logClusterService;
-        this.asyncGroqService   = asyncGroqService;
+        this.groqService        = groqService;
     }
 
     // -------------------------------------------------------------------------
-    // POST /logs — async-friendly ingestion
+    // POST /logs
     // -------------------------------------------------------------------------
 
     /**
-     * Accepts a new log entry, validates it, and persists it to PostgreSQL.
+     * Accepts a JSON body representing a new log entry, validates it, persists it
+     * to PostgreSQL, and returns the saved entity (including the generated ID and
+     * auto-set timestamp).
      *
-     * Returns HTTP 202 Accepted (instead of 201 Created) to signal that the
-     * entry has been queued/stored and any background enrichment (clustering,
-     * AI analysis) will happen asynchronously on the read path.
+     * @Valid   – triggers Bean Validation on the incoming request body.
+     *            If any @NotBlank constraint is violated, Spring returns a
+     *            400 Bad Request with detailed error information automatically.
      *
-     * This makes the ingestion endpoint non-blocking: callers don't wait for
-     * any LLM processing; they can fire-and-forget at high throughput.
+     * @RequestBody – deserialises the incoming JSON payload into a LogEntry object.
+     *
+     * Returns HTTP 201 Created on success.
      */
     @PostMapping
     public ResponseEntity<LogEntry> createLogEntry(@Valid @RequestBody LogEntry logEntry) {
         LogEntry savedEntry = logEntryRepository.save(logEntry);
-        // 202 Accepted: entry is stored; async analysis happens on the read path
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(savedEntry);
+        return ResponseEntity.status(HttpStatus.CREATED).body(savedEntry);
     }
 
     // -------------------------------------------------------------------------
@@ -77,7 +76,11 @@ public class LogEntryController {
 
     /**
      * Retrieves all log entries from the database and returns them as a JSON array.
-     * Returns HTTP 200 OK (empty array [] if no entries exist yet).
+     *
+     * Returns HTTP 200 OK with the list (empty array [] if no entries exist yet).
+     *
+     * For production use, consider adding pagination via Pageable to avoid
+     * returning unbounded result sets.
      */
     @GetMapping
     public ResponseEntity<List<LogEntry>> getAllLogEntries() {
@@ -90,8 +93,27 @@ public class LogEntryController {
     // -------------------------------------------------------------------------
 
     /**
-     * Returns WARN/ERROR log clusters sorted by count descending.
-     * Each cluster now includes an {@code anomalyScore} z-score field.
+     * Returns WARN and ERROR log entries grouped into clusters.
+     *
+     * A cluster represents a set of log entries sharing the same:
+     *   - serviceName
+     *   - logLevel  (only WARN or ERROR — INFO is too noisy to be useful signal)
+     *   - 10-minute time bucket (timestamp floored to the nearest 10 minutes)
+     *
+     * Each cluster in the response includes:
+     *   - serviceName      – which service produced the events
+     *   - logLevel         – WARN or ERROR
+     *   - timeBucketStart  – ISO-8601 start of the 10-minute window
+     *   - count            – number of log entries in the cluster
+     *   - sampleMessages   – up to 3 representative messages
+     *
+     * Results are sorted by count descending so the highest-volume incidents
+     * appear first, making triage faster.
+     *
+     * Returns HTTP 200 OK with an empty array [] if no WARN/ERROR entries exist.
+     *
+     * Delegates entirely to LogClusterService — the controller only handles
+     * the HTTP layer (routing + response wrapping).
      */
     @GetMapping("/clusters")
     public ResponseEntity<List<LogClusterResult>> getLogClusters() {
@@ -100,49 +122,38 @@ public class LogEntryController {
     }
 
     // -------------------------------------------------------------------------
-    // GET /logs/clusters/summary — parallel AI enrichment
+    // GET /logs/clusters/summary
     // -------------------------------------------------------------------------
 
     /**
-     * Returns WARN/ERROR clusters each enriched with a Groq AI summary.
+     * Returns the same WARN/ERROR clusters as GET /logs/clusters, but each
+     * cluster is enriched with an "aiSummary" field — a 1-2 sentence plain-
+     * English explanation generated by the Groq LLM (llama-3.3-70b-versatile).
      *
-     * Parallel execution strategy:
-     *   1. Compute all clusters synchronously (fast — in-memory grouping).
-     *   2. Fan-out: fire one AsyncGroqService.summarizeAsync() call per cluster.
-     *      Each call runs on a Spring @Async thread-pool thread concurrently.
-     *   3. CompletableFuture.allOf() blocks until ALL summaries have returned
-     *      (or timed out / failed gracefully with "Summary unavailable").
-     *   4. Collect results and return the enriched list.
+     * Error resilience:
+     *   If the Groq API call fails for any cluster (bad key, rate limit, network
+     *   issue), that cluster's aiSummary is set to "Summary unavailable" and
+     *   processing continues.  The endpoint never returns a 5xx due to an AI
+     *   failure.
      *
-     * Before this change: 10 clusters × ~1.5 s = ~15 s total latency.
-     * After  this change: max(10 × ~1.5 s) ≈ ~1.5 s total latency.
+     * Performance note:
+     *   Groq API calls are made sequentially.  For large cluster sets, consider
+     *   using CompletableFuture / virtual threads to parallelise the LLM calls.
+     *
+     * Returns HTTP 200 OK with an empty array [] if no WARN/ERROR clusters exist.
      */
     @GetMapping("/clusters/summary")
     public ResponseEntity<List<LogClusterSummary>> getLogClusterSummaries() {
         List<LogClusterResult> clusters = logClusterService.computeClusters();
 
-        if (clusters.isEmpty()) {
-            return ResponseEntity.ok(List.of());
-        }
-
-        // Fan-out: one CompletableFuture per cluster (each runs on async thread pool)
-        List<CompletableFuture<String>> futures = clusters.stream()
-                .map(asyncGroqService::summarizeAsync)
-                .collect(Collectors.toList());
-
-        // Wait for all AI calls to complete
-        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
-
-        // Zip clusters with their summaries
-        List<LogClusterSummary> summaries = IntStream.range(0, clusters.size())
-                .mapToObj(i -> {
-                    String aiSummary = futures.get(i).join(); // already done — instant
-                    return new LogClusterSummary(clusters.get(i), aiSummary);
+        List<LogClusterSummary> summaries = clusters.stream()
+                .map(cluster -> {
+                    // GroqService.summarize() never throws — it returns the
+                    // fallback string on any error, so no try/catch needed here.
+                    String aiSummary = groqService.summarize(cluster);
+                    return new LogClusterSummary(cluster, aiSummary);
                 })
                 .collect(Collectors.toList());
-
-        log.debug("LogEntryController: returned {} summaries (parallel AI calls)",
-                summaries.size());
 
         return ResponseEntity.ok(summaries);
     }

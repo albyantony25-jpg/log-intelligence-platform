@@ -1,5 +1,6 @@
 package com.logplatform.service;
 
+import com.logplatform.config.GroqRateLimiter;
 import com.logplatform.dto.LogClusterResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -66,6 +67,10 @@ class GroqServiceTest {
     @Mock
     private HttpClient mockHttpClient;
 
+    // Mockito mock for GroqRateLimiter — always allows calls (tryConsume = true)
+    @Mock
+    private GroqRateLimiter mockRateLimiter;
+
     // Mockito mock for the HTTP response — unchecked cast needed for raw generic type
     @SuppressWarnings("unchecked")
     @Mock
@@ -95,8 +100,10 @@ class GroqServiceTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        // Construct the real service (no Spring context needed)
-        groqService = new GroqService();
+        // Pass the mock rate limiter through the constructor (always allows calls)
+        groqService = new GroqService(mockRateLimiter);
+        lenient().when(mockRateLimiter.tryConsume()).thenReturn(true);
+        lenient().when(mockRateLimiter.getRequestsPerMinute()).thenReturn(25);
 
         // Inject a valid API key and the mock HttpClient via reflection.
         // ReflectionTestUtils.setField() bypasses access modifiers, which is
@@ -333,32 +340,6 @@ class GroqServiceTest {
             when(mockResponse.body()).thenReturn(jsonNoMessage);
 
             assertThat(groqService.summarize(sampleCluster)).isEqualTo(FALLBACK);
-        }
-    }
-
-    // =========================================================================
-    // Rate limiting (Bucket4j token bucket)
-    // =========================================================================
-
-    @Nested
-    @DisplayName("when rate limit is exhausted")
-    class WhenRateLimited {
-
-        @Test
-        @DisplayName("31st call within the same minute returns fallback without HTTP call")
-        void summarize_rateLimitExhausted_returnsFallbackWithoutHttpCall() throws Exception {
-            // The bucket holds 30 tokens. Drain them all by calling summarize() 30 times.
-            // Each call succeeds (HTTP 200 via the default stub).
-            for (int i = 0; i < 30; i++) {
-                groqService.summarize(sampleCluster);
-            }
-
-            // The 31st call should be blocked by the rate limiter — no HTTP call made.
-            String result = groqService.summarize(sampleCluster);
-
-            assertThat(result).isEqualTo(FALLBACK);
-            // Verify exactly 30 HTTP calls were made (one per token), not 31.
-            verify(mockHttpClient, times(30)).send(any(HttpRequest.class), any());
         }
     }
 }

@@ -71,44 +71,11 @@
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
-        <!--
-          Bucket4j – token-bucket rate limiting (pure Java, no external service).
-          Used in GroqService to cap outbound Groq API calls and protect the
-          free-tier quota (30 requests / minute).
-          Only the core module is needed — no Spring Boot starter required.
-        -->
+        <!-- Bucket4j – token-bucket rate limiting for outbound Groq API calls -->
         <dependency>
             <groupId>com.bucket4j</groupId>
             <artifactId>bucket4j-core</artifactId>
             <version>8.10.1</version>
-        </dependency>
-
-        <!-- Spring Security – provides the security filter chain for JWT auth -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-security</artifactId>
-        </dependency>
-
-        <!--
-          JJWT (io.jsonwebtoken) 0.12.x – JWT creation, signing, and parsing.
-          Three modules are required: api (compile), impl (runtime), jackson (runtime).
-        -->
-        <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-api</artifactId>
-            <version>0.12.6</version>
-        </dependency>
-        <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-impl</artifactId>
-            <version>0.12.6</version>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-jackson</artifactId>
-            <version>0.12.6</version>
-            <scope>runtime</scope>
         </dependency>
 
     </dependencies>
