@@ -27,6 +27,21 @@ Log Intelligence Platform solves this by:
 
 ![Dashboard Demo](demo.gif)
 
+### UI Features
+*Note: Replace placeholders with actual GIFs/Screenshots*
+
+**Real-Time Log Ticker & Staggered Animations**
+> *[Placeholder: GIF showing logs arriving via WebSocket and cluster cards animating in]*
+
+**Pulse Animation & Anomaly Detection**
+> *[Placeholder: GIF showing high-severity clusters pulsing until acknowledged]*
+
+**Smooth Expanding Cards & AI Summaries**
+> *[Placeholder: GIF showing layout transitions when a cluster card is expanded to reveal AI summaries]*
+
+**Dark Mode & Theming**
+> *[Placeholder: Screenshot of Light/Dark mode toggle in action]*
+
 ---
 
 ## Architecture
