@@ -9,6 +9,8 @@
  *   apiConnected (boolean) — true once data has loaded without error
  */
 
+import SimulatorControl from './SimulatorControl'
+
 /**
  * The outer ping ring uses Tailwind's built-in `animate-ping` utility which
  * scales and fades a copy of the dot outward — a clean "live" indicator.
@@ -38,24 +40,28 @@ export default function Header({ apiConnected }) {
           </p>
         </div>
 
-        {/* Live status pill */}
-        <div className="flex items-center gap-2 bg-surface border border-border rounded-full px-3 py-1.5 flex-shrink-0 mt-1">
-          {/* Pulsing dot — green = connected, red = error */}
-          <span className="relative flex h-2 w-2">
-            <span
-              className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                apiConnected ? 'bg-success' : 'bg-error'
-              }`}
-            />
-            <span
-              className={`relative inline-flex rounded-full h-2 w-2 ${
-                apiConnected ? 'bg-success' : 'bg-error'
-              }`}
-            />
-          </span>
-          <span className="text-xs font-medium text-dim">
-            {apiConnected ? 'API connected' : 'Connecting…'}
-          </span>
+        {/* Right side: Simulator Control + Live status pill */}
+        <div className="flex items-center gap-3 mt-1">
+          <SimulatorControl />
+          
+          <div className="flex items-center gap-2 bg-surface border border-border rounded-full px-3 py-1.5 flex-shrink-0">
+            {/* Pulsing dot — green = connected, red = error */}
+            <span className="relative flex h-2 w-2">
+              <span
+                className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                  apiConnected ? 'bg-success' : 'bg-error'
+                }`}
+              />
+              <span
+                className={`relative inline-flex rounded-full h-2 w-2 ${
+                  apiConnected ? 'bg-success' : 'bg-error'
+                }`}
+              />
+            </span>
+            <span className="text-xs font-medium text-dim">
+              {apiConnected ? 'API connected' : 'Connecting…'}
+            </span>
+          </div>
         </div>
       </div>
 
