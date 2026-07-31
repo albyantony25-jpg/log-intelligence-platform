@@ -33,6 +33,12 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- Spring WebSocket – for real-time log/cluster streaming -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+
         <!-- Spring Data JPA – wraps Hibernate for ORM + repository support -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

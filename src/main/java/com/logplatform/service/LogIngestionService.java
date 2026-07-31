@@ -18,9 +18,12 @@ public class LogIngestionService {
     private static final Logger log = LoggerFactory.getLogger(LogIngestionService.class);
     
     private final LogEntryRepository logEntryRepository;
+    private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
 
-    public LogIngestionService(LogEntryRepository logEntryRepository) {
+    public LogIngestionService(LogEntryRepository logEntryRepository, 
+                               org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate) {
         this.logEntryRepository = logEntryRepository;
+        this.messagingTemplate = messagingTemplate;
     }
 
     /**
@@ -32,6 +35,15 @@ public class LogIngestionService {
     public CompletableFuture<LogEntry> ingestLog(LogEntry logEntry) {
         LogEntry saved = logEntryRepository.save(logEntry);
         log.debug("Asynchronously saved log entry: {}", saved.getId());
+        
+        // Broadcast raw log to WebSocket clients
+        messagingTemplate.convertAndSend("/topic/logs", saved);
+        
+        // If it's a WARN or ERROR, it affects clusters, so broadcast a generic update ping
+        if ("WARN".equals(saved.getLogLevel()) || "ERROR".equals(saved.getLogLevel())) {
+            messagingTemplate.convertAndSend("/topic/clusters", java.util.Map.of("status", "updated", "id", saved.getId()));
+        }
+        
         return CompletableFuture.completedFuture(saved);
     }
 }
