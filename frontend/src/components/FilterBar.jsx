@@ -9,7 +9,8 @@
  *   filter    (string)   — currently active filter: 'ALL' | 'ERROR' | 'WARN'
  *   setFilter (function) — setter from useState in App
  *   counts    (object)   — { all, error, warn } cluster counts for badge labels
-import { motion, AnimatePresence } from 'framer-motion'
+ */
+import { m, AnimatePresence } from 'framer-motion'
 
 export default function FilterBar({ filter, setFilter, counts }) {
   const buttons = [
@@ -37,14 +38,14 @@ export default function FilterBar({ filter, setFilter, counts }) {
   ]
 
   return (
-    <motion.div layout className="flex items-center gap-2 mb-6 flex-wrap">
-      <motion.span layout className="text-xs text-dim font-medium mr-1">Filter by severity:</motion.span>
+    <m.div layout className="flex items-center gap-2 mb-6 flex-wrap">
+      <m.span layout className="text-xs text-dim font-medium mr-1">Filter by severity:</m.span>
 
       <AnimatePresence mode="popLayout">
         {buttons.map(({ label, value, count, activeClass, countClass }) => {
           const isActive = filter === value
           return (
-            <motion.button
+            <m.button
               layout
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -61,7 +62,7 @@ export default function FilterBar({ filter, setFilter, counts }) {
               `}
             >
               {isActive && (
-                <motion.div
+                <m.div
                   layoutId="activeFilterGlow"
                   className="absolute inset-0 rounded-lg bg-white opacity-5"
                 />
@@ -74,12 +75,12 @@ export default function FilterBar({ filter, setFilter, counts }) {
               `}>
                 {count}
               </span>
-            </motion.button>
+            </m.button>
           )
         })}
 
         {filter !== 'ALL' && (
-          <motion.button
+          <m.button
             layout
             initial={{ opacity: 0, x: -10, scale: 0.8 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
@@ -91,9 +92,9 @@ export default function FilterBar({ filter, setFilter, counts }) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
             Clear Filter
-          </motion.button>
+          </m.button>
         )}
       </AnimatePresence>
-    </motion.div>
+    </m.div>
   )
 }

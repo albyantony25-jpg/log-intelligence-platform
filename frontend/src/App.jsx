@@ -24,7 +24,7 @@
  *   filter       — 'ALL' | 'ERROR' | 'WARN', controls which clusters are shown
  */
 import { useState, useEffect, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client/dist/sockjs'
 
@@ -194,16 +194,16 @@ export default function App() {
         {/* 4. Main Feed — clusters list or empty state */}
         <AnimatePresence mode="wait">
           {loading ? (
-            <motion.div
+            <m.div
               key="loading"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
               <LoadingSkeleton />
-            </motion.div>
+            </m.div>
           ) : filteredClusters.length === 0 ? (
-            <motion.div
+            <m.div
               key="empty"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -217,9 +217,9 @@ export default function App() {
               </div>
               <h3 className="text-lg font-medium text-white mb-1">All clear</h3>
               <p className="text-sm text-dim">No anomalies detected for the selected filter.</p>
-            </motion.div>
+            </m.div>
           ) : (
-            <motion.div
+            <m.div
               key={filter}
               initial={{ opacity: 0, x: -15 }}
               animate={{ opacity: 1, x: 0 }}
@@ -233,7 +233,7 @@ export default function App() {
                   cluster={cluster}
                 />
               ))}
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
 

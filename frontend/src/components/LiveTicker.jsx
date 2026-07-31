@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client/dist/sockjs'
 
@@ -58,7 +58,7 @@ export default function LiveTicker({ onNewLog }) {
             const isWarn = log.logLevel === 'WARN'
             
             return (
-              <motion.div
+              <m.div
                 key={log.id}
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -79,7 +79,7 @@ export default function LiveTicker({ onNewLog }) {
                 <div className="flex-grow truncate">
                   {log.message}
                 </div>
-              </motion.div>
+              </m.div>
             )
           })}
         </AnimatePresence>

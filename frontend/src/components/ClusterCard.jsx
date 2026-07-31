@@ -19,8 +19,8 @@
  *     { serviceName, logLevel, timeBucketStart, count, sampleMessages, aiSummary }
  */
 import { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
-import anime from 'animejs'
+import { m, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { animate } from 'animejs'
 
 /* Framer-motion variants shared with the parent container in App.jsx.
    The parent uses staggerChildren so each card's "visible" animation fires
@@ -106,40 +106,38 @@ export default function ClusterCard({ cluster }) {
   useEffect(() => {
     if (cluster.count > prevCount.current) {
       // Flash the card border when a new log is added
-      if (cardRef.current) {
-        anime({
-          targets: cardRef.current,
+      if (cardRef.current && !shouldReduceMotion) {
+        animate(cardRef.current, {
           boxShadow: [
-            { value: `0 0 0px 0px ${SEVERITY[cluster.logLevel]?.badgeBorder.match(/rgba\(.*\)/)?.[0] || 'rgba(255,255,255,0.5)'}`, duration: 0 },
-            { value: `0 0 15px 2px ${SEVERITY[cluster.logLevel]?.badgeBorder.match(/rgba\(.*\)/)?.[0] || 'rgba(255,255,255,0.5)'}`, duration: 400, easing: 'easeOutExpo' },
-            { value: '0 0 0px 0px rgba(0,0,0,0)', duration: 800, easing: 'easeInSine' }
-          ]
+            { value: '0 0 0px 0px rgba(129,140,248,0)', duration: 0 },
+            { value: '0 0 15px 2px rgba(129,140,248,0.6)', duration: 300 },
+            { value: '0 0 0px 0px rgba(129,140,248,0)', duration: 600 }
+          ],
+          ease: 'outExpo'
         })
       }
       prevCount.current = cluster.count
     }
-  }, [cluster.count, cluster.logLevel])
+  }, [cluster.count, cluster.logLevel, shouldReduceMotion])
 
   // 2. Continuous pulse for unacknowledged ERRORs
   useEffect(() => {
     if (cluster.logLevel === 'ERROR' && !acknowledged && cardRef.current && !shouldReduceMotion) {
-      pulseAnimRef.current = anime({
-        targets: cardRef.current,
+      pulseAnimRef.current = animate(cardRef.current, {
         boxShadow: [
           { value: '0 0 0px 0px rgba(239,68,68,0)', duration: 0 },
           { value: '0 0 10px 1px rgba(239,68,68,0.4)', duration: 1500 },
           { value: '0 0 0px 0px rgba(239,68,68,0)', duration: 1500 }
         ],
         loop: true,
-        easing: 'easeInOutSine'
+        ease: 'inOutSine'
       })
     } else if (pulseAnimRef.current) {
       pulseAnimRef.current.pause()
-      anime({
-        targets: cardRef.current,
+      animate(cardRef.current, {
         boxShadow: '0 0 0px 0px rgba(0,0,0,0)',
         duration: 300,
-        easing: 'easeOutSine'
+        ease: 'outSine'
       })
     }
 
@@ -155,7 +153,7 @@ export default function ClusterCard({ cluster }) {
   const hasSummary = cluster.aiSummary && cluster.aiSummary !== 'Summary unavailable'
 
   return (
-    <motion.div
+    <m.div
       layout
       ref={cardRef}
       variants={getCardVariants(shouldReduceMotion)}
@@ -263,7 +261,7 @@ export default function ClusterCard({ cluster }) {
           {/* Messages list — rendered only when expanded */}
           <AnimatePresence>
             {expanded && (
-              <motion.div 
+              <m.div 
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
@@ -278,11 +276,11 @@ export default function ClusterCard({ cluster }) {
                     {msg}
                   </div>
                 ))}
-              </motion.div>
+              </m.div>
             )}
           </AnimatePresence>
         </div>
       )}
-    </motion.div>
+    </m.div>
   )
 }
