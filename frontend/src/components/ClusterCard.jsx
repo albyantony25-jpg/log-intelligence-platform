@@ -96,10 +96,13 @@ const SEVERITY = {
 export default function ClusterCard({ cluster }) {
   // Controls whether sample messages are visible
   const [expanded, setExpanded] = useState(false)
+  const [acknowledged, setAcknowledged] = useState(false)
   const shouldReduceMotion = useReducedMotion()
   const prevCount = useRef(cluster.count)
   const cardRef = useRef(null)
+  const pulseAnimRef = useRef(null)
 
+  // 1. Flash when count increases
   useEffect(() => {
     if (cluster.count > prevCount.current) {
       // Flash the card border when a new log is added
@@ -117,6 +120,34 @@ export default function ClusterCard({ cluster }) {
     }
   }, [cluster.count, cluster.logLevel])
 
+  // 2. Continuous pulse for unacknowledged ERRORs
+  useEffect(() => {
+    if (cluster.logLevel === 'ERROR' && !acknowledged && cardRef.current && !shouldReduceMotion) {
+      pulseAnimRef.current = anime({
+        targets: cardRef.current,
+        boxShadow: [
+          { value: '0 0 0px 0px rgba(239,68,68,0)', duration: 0 },
+          { value: '0 0 10px 1px rgba(239,68,68,0.4)', duration: 1500 },
+          { value: '0 0 0px 0px rgba(239,68,68,0)', duration: 1500 }
+        ],
+        loop: true,
+        easing: 'easeInOutSine'
+      })
+    } else if (pulseAnimRef.current) {
+      pulseAnimRef.current.pause()
+      anime({
+        targets: cardRef.current,
+        boxShadow: '0 0 0px 0px rgba(0,0,0,0)',
+        duration: 300,
+        easing: 'easeOutSine'
+      })
+    }
+
+    return () => {
+      if (pulseAnimRef.current) pulseAnimRef.current.pause()
+    }
+  }, [cluster.logLevel, acknowledged, shouldReduceMotion])
+
   const sev     = SEVERITY[cluster.logLevel] || SEVERITY.WARN
   const bucketStart = formatTime(cluster.timeBucketStart)
   const bucketEndTime = bucketEnd(cluster.timeBucketStart)
@@ -131,7 +162,10 @@ export default function ClusterCard({ cluster }) {
       initial="hidden"
       whileInView="visible"
       viewport={{ once: true, margin: "-50px" }}
-      onClick={() => setExpanded(!expanded)}
+      onClick={() => {
+        setExpanded(!expanded)
+        if (!acknowledged) setAcknowledged(true)
+      }}
       className={`
         bg-surface rounded-xl p-5 cursor-pointer
         transition-all duration-200 ${sev.glowClass} hover:border-slate-600 border border-transparent
