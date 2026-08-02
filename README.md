@@ -23,22 +23,22 @@
 
 ```mermaid
 graph TD
-    Sim["Log Simulator"] -->|POST (Synthetic Logs)| Ingest["Ingestion Pipeline"]
-    Client["Client Services"] -->|POST /logs| Ingest
+    Sim["Log Simulator"] -->|"POST (Synthetic Logs)"| Ingest["Ingestion Pipeline"]
+    Client["Client Services"] -->|"POST /logs"| Ingest
     
-    Ingest -->|JPA/Hibernate| DB[("PostgreSQL")]
-    Ingest -->|Raw Log Event| WS["WebSocket (/topic/logs)"]
+    Ingest -->|"JPA/Hibernate"| DB[("PostgreSQL")]
+    Ingest -->|"Raw Log Event"| WS["WebSocket (/topic/logs)"]
     
-    DB -->|Log Fetch| Cluster["Clustering Engine"]
-    Cluster -->|Z-Score Anomaly| Score["Scoring Engine"]
+    DB -->|"Log Fetch"| Cluster["Clustering Engine"]
+    Cluster -->|"Z-Score Anomaly"| Score["Scoring Engine"]
     
     Score --> GroqCache{"Redis Cache"}
-    GroqCache -->|Cache Miss| Groq["Groq API (Llama 3.3)"]
-    GroqCache -->|Cache Hit| AI_Summary["AI Summary"]
+    GroqCache -->|"Cache Miss"| Groq["Groq API (Llama 3.3)"]
+    GroqCache -->|"Cache Hit"| AI_Summary["AI Summary"]
     Groq --> AI_Summary
     
-    AI_Summary -->|Cluster Updates| WS
-    WS -->|STOMP Broadcast| React["React Dashboard"]
+    AI_Summary -->|"Cluster Updates"| WS
+    WS -->|"STOMP Broadcast"| React["React Dashboard"]
 ```
 
 ## Setup Instructions
